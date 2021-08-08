@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-class GaussianFourierFeatureTransform(torch.nn.Module):
+class GaussianFourierFeatures(torch.nn.Module):
     """
     An implementation of Gaussian Fourier feature mapping.
 
@@ -21,21 +21,21 @@ class GaussianFourierFeatureTransform(torch.nn.Module):
         self._B = torch.randn((num_input_channels, mapping_size)) * scale
 
     def forward(self, x):
-        assert x.dim() == 4, 'Expected 4D input (got {}D input)'.format(x.dim())
+        assert x.dim() == 3, 'Expected 3D input (got {}D input)'.format(x.dim())
 
-        batches, channels, width, height = x.shape
+        batches, channels, n = x.shape
 
         assert channels == self._num_input_channels,\
             "Expected input to have {} channels (got {} channels)".format(self._num_input_channels, channels)
 
         # Make shape compatible for matmul with _B.
         # From [B, C, W, H] to [(B*W*H), C].
-        x = x.permute(0, 2, 3, 1).reshape(batches * width * height, channels)
+        x = x.permute(0, 2, 3, 1).reshape(batches * n, channels)
 
         x = x @ self._B.to(x.device)
 
         # From [(B*W*H), C] to [B, W, H, C]
-        x = x.view(batches, width, height, self._mapping_size)
+        x = x.view(batches, n, self._mapping_size)
         # From [B, W, H, C] to [B, C, W, H]
         x = x.permute(0, 3, 1, 2)
 

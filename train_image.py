@@ -1,7 +1,11 @@
+from torch.utils.data.dataset import Dataset
+from features import GaussianFourierFeatures
 import torch
 import os
 
 from torch import nn
+from torch.utils.data import DataLoader
+
 import tqdm
 import cv2
 
@@ -10,6 +14,9 @@ from structs import struct
 
 from os import path
 from natsort import natsorted
+
+from model import MLP, mlp
+
 
 image_extensions = ['jpg', 'jpeg', 'png', 'ppm', 'bmp']
 
@@ -21,66 +28,82 @@ def find_images(filepath, extensions=image_extensions):
                 if has_extension(extensions, path.join(filepath, filename))]
 
 
-
 def psnr(mse): 
   return -10 * torch.log10(mse)
 
 
-def train_model(model, learning_rate,  images, iters=10, device='cuda:0'):
+def train_model(model, learning_rate,  training, iters=100):
 
     optim = torch.optim.Adam(model.parameters(), lr=learning_rate)
     loss_fn = torch.nn.MSELoss()
 
     train_psnrs = []
-    xs = []
 
-    for data in images:
-        model.train()
-        optim.zero_grad()
+    for _ in range(iters):
+      for data in training:
 
-        output = model(data.grid)
-        loss = loss_fn(output, data.labels)
+          model.train()
+          optim.zero_grad()
 
-        loss.backward()
-        optim.step()
+          output = model(data.grid)
+          loss = loss_fn(output, data.labels)
 
-        train_psnrs.append(psnr(loss))
+          loss.backward()
+          optim.step()
 
-    # cv2.imwrite(f"imgs/{i}.jpeg", v_o.permute(0, 3, 1, 2))
+          train_psnrs.append(psnr(loss).item())
 
 
 def create_grid(w, h):
-    grid_y, grid_x = torch.meshgrid([torch.linspace(0, 1, steps=h), torch.linspace(0, 1, steps=w)])
-    return torch.stack([grid_y, grid_x], dim=-1)
+    y, x = torch.meshgrid([
+      torch.linspace(0, 1, steps=h), 
+      torch.linspace(0, 1, steps=w)
+    ])
+
+    return torch.stack([y, x], dim=-1)
 
 
 def load_image(filename, device="cpu"):
   image = cv2.imread(filename, cv2.IMREAD_COLOR)
   grid = create_grid(image.shape[1], image.shape[0])
 
-  return struct (
+  return dict (
     image = image.to(device),
     grid = grid.to(device),
     filename = filename
   )
 
+class ImageDataset(Dataset):
+  def __init__(self, images):
+    super(ImageDataset, self).__init__()
+    self.images = images
+
+  def __len__(self):
+    return len(self.images)
+
+  def __getitem__(self, index):
+      return self.images[index]
+
+
 def main():
   parser = ArgumentParser()
-  parser.add_argument("input", help="input path")
+  parser.add_argument("input", default="./test_images", help="input path")
 
   args = parser.parse_args()
-
   device = "cuda:0"
 
-  learning_rate = 1e-4
-  iters = 250
+  assert path.isdir(args.input)
+  images = [load_image(image) for image in find_images(args.input)]
 
   mapping_size = 256
 
-  assert path.isdir(args.input)
-  images = find_images(args.input)
+  model = nn.Sequential(
+    GaussianFourierFeatures(2, mapping_size),
+    MLP(mapping_size, mapping_size, output_size=3, num_layers=4)
+  )
 
-  output = train_model(learning_rate, iters, device=device)  
+  training = DataLoader(ImageDataset(images), batch_size=1, num_workers=1)
+  train_model(model, training, learning_rate=1e-4, iters=250, device=device)  
 
 
 if __name__ == '__main__':

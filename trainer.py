@@ -24,7 +24,7 @@ class CoordinateEncoder(pl.LightningModule):
     return self.model.forward(ids, grids)
 
   def configure_optimizers(self):
-    optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
+    optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
     return optimizer
 
   def compare(self, batch):

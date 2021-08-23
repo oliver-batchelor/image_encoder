@@ -9,16 +9,18 @@ from structs.torch import shape
 import pytorch_lightning as pl
 from operator import add
 from functools import reduce
+from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR
 
 
 def psnr(mse): 
   return -10 * torch.log10(mse)
 
-class CoordinateEncoder(pl.LightningModule):
-  def __init__(self, model, lr=1e-3):
-    super(CoordinateEncoder, self).__init__()
+class CoordinateTrainer(pl.LightningModule):
+  def __init__(self, model, lr=1e-3, train_interations=1000):
+    super(CoordinateTrainer, self).__init__()
     self.model = model
     self.lr = lr
+    self.train_iterations = train_interations
 
   def forward(self, ids, grids):
     return self.model.forward(ids, grids)
@@ -26,6 +28,14 @@ class CoordinateEncoder(pl.LightningModule):
   def configure_optimizers(self):
     optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
     return optimizer
+    # scheduler = ExponentialLR(optimizer, gamma=0.1**(1/self.train_iterations), last_epoch=-1, verbose=False)
+    # scheduler = {
+    #     'scheduler': scheduler,
+    #     'interval': 'step',
+    #     'frequency': 1,
+    # }
+
+    # return [optimizer], [scheduler]
 
   def compare(self, batch):
     output = self.forward(batch.id, batch.grid)

@@ -36,7 +36,7 @@ def escape(filename):
 def load_image(base_path, filename, device="cpu"):
   image = cv2.imread(path.join(base_path, filename), cv2.IMREAD_COLOR)
   image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-  
+
   grid = create_grid(image.shape[1], image.shape[0])
 
   return struct (

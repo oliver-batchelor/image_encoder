@@ -37,7 +37,7 @@ class Siren(nn.Module):
 
 class SirenNet(nn.Module):
   def __init__(self, input_size, hidden_size, output_size=3, 
-      num_layers=4, w0=1, w0_initial=30, c=6):
+      num_layers=4, w0=5, w0_initial=30, c=6):
     super().__init__()
     assert num_layers >= 3
 

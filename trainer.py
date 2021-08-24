@@ -16,7 +16,7 @@ def psnr(mse):
   return -10 * torch.log10(mse)
 
 class CoordinateTrainer(pl.LightningModule):
-  def __init__(self, model, lr=1e-3, train_interations=1000):
+  def __init__(self, model, lr=1e-3, train_interations=20):
     super(CoordinateTrainer, self).__init__()
     self.model = model
     self.lr = lr
@@ -27,15 +27,14 @@ class CoordinateTrainer(pl.LightningModule):
 
   def configure_optimizers(self):
     optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-    return optimizer
-    # scheduler = ExponentialLR(optimizer, gamma=0.1**(1/self.train_iterations), last_epoch=-1, verbose=False)
-    # scheduler = {
-    #     'scheduler': scheduler,
-    #     'interval': 'step',
-    #     'frequency': 1,
-    # }
+    scheduler = ExponentialLR(optimizer, gamma=0.1**(1/self.train_iterations), last_epoch=-1, verbose=False)
+    scheduler = {
+        'scheduler': scheduler,
+        'interval': 'epoch',
+        'frequency': 1,
+    }
 
-    # return [optimizer], [scheduler]
+    return [optimizer], [scheduler]
 
   def compare(self, batch):
     output = self.forward(batch.id, batch.grid)
@@ -45,7 +44,7 @@ class CoordinateTrainer(pl.LightningModule):
   def training_step(self, train_batch, batch_idx):
     train_batch = Struct(train_batch)
     _, loss = self.compare(train_batch)
-    self.log('train_psnr', psnr(loss).item())
+    self.log('train_psnr', psnr(loss).item(), prog_bar=True)
     return loss
 
   def validation_step(self, val_batch, batch_idx):
@@ -61,6 +60,7 @@ class CoordinateTrainer(pl.LightningModule):
     )
 
     self.log(f'val_psnr_{id}', result.psnr)
+
     w, h = val_batch.image_size[0]
     image = output.view(3, h.item(), w.item())
 
@@ -70,7 +70,7 @@ class CoordinateTrainer(pl.LightningModule):
   def validation_epoch_end(self, results):
     total = reduce(add, results) / len(results)
 
-    self.log(f'val_psnr', total.psnr)
+    self.log(f'val_psnr', total.psnr, prog_bar=True)
     self.log(f'val_mse', total.mse)
 
 

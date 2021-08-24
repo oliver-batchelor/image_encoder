@@ -11,7 +11,7 @@ from argparse import ArgumentParser
 
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
-
+from pytorch_lightning.callbacks import LearningRateMonitor
 
 def random_fourier(image_ids, mapping_size, num_layers=4):
   def create_model():
@@ -19,6 +19,7 @@ def random_fourier(image_ids, mapping_size, num_layers=4):
       MLP(mapping_size, mapping_size, output_size=3, num_layers=num_layers),
       nn.Sigmoid()
     )
+
 
   # def create_model():
   #   return nn.Sequential(
@@ -42,14 +43,16 @@ def main():
   with torch.no_grad():
     images = load_images(args.input)
     
-    loaders = dataloaders(images, batch_size=4, samples=32*1024, epoch_size=256)
+    loaders = dataloaders(images, batch_size=5, samples=32*1024, epoch_size=512)
     encoder = CoordinateTrainer(model = 
-      random_fourier([image.id for image in images], mapping_size = 256, num_layers=4),
-      lr = 1e-3)
+      random_fourier([image.id for image in images], mapping_size = 512, num_layers=8),
+      lr = 1e-3, train_interations=20)
 
+    lr_monitor = LearningRateMonitor(logging_interval='step')
 
     logger = TensorBoardLogger("log", name="encoder")
-    trainer = Trainer(logger=logger, gpus=1, precision=16)
+    trainer = Trainer(logger=logger, gpus=1, precision=16, 
+        callbacks=[lr_monitor])
 
   trainer.fit(encoder, train_dataloaders=loaders.train, val_dataloaders=loaders.test)
 

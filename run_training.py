@@ -1,5 +1,5 @@
 from model.mlp import MLP
-from model.split import PerImage
+from model.split import PerImage, SplitGrid
 import torch
 from model.siren import SirenNet
 from torch import nn
@@ -27,9 +27,9 @@ def random_fourier(image_ids, mapping_size, num_layers=4):
   #   )
 
 
-  with torch.no_grad():
-    return PerImage(image_ids, create_model)
+  # return PerImage(image_ids, partial(SplitGrid, (4, 4), create_model))
 
+  return PerImage(image_ids, create_model)
 
 
 
@@ -38,16 +38,18 @@ def main():
   parser.add_argument("input", default="./test_images", help="input path")
 
   args = parser.parse_args()
-  images = load_images(args.input)
-  
-  loaders = dataloaders(images, batch_size=4, samples=32*1024, epoch_size=256)
-  encoder = CoordinateTrainer(model = 
-    random_fourier([image.id for image in images], mapping_size = 256, num_layers=4),
-    lr = 1e-3)
+
+  with torch.no_grad():
+    images = load_images(args.input)
+    
+    loaders = dataloaders(images, batch_size=4, samples=32*1024, epoch_size=256)
+    encoder = CoordinateTrainer(model = 
+      random_fourier([image.id for image in images], mapping_size = 256, num_layers=4),
+      lr = 1e-3)
 
 
-  logger = TensorBoardLogger("log", name="encoder")
-  trainer = Trainer(logger=logger, gpus=1, precision=16)
+    logger = TensorBoardLogger("log", name="encoder")
+    trainer = Trainer(logger=logger, gpus=1, precision=16)
 
   trainer.fit(encoder, train_dataloaders=loaders.train, val_dataloaders=loaders.test)
 

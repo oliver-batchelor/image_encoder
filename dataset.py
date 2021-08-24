@@ -29,8 +29,6 @@ def create_grid(w, h):
 
     return torch.stack([y, x], dim=0)
 
-def escape(filename):
-  return filename.replace('.', '_')
 
 
 def load_image(base_path, filename, device="cpu"):
@@ -42,9 +40,7 @@ def load_image(base_path, filename, device="cpu"):
   return struct (
     image = torch.from_numpy(image).permute(2, 0, 1).to(device),
     grid = grid.to(device),
-    filename = filename,
-    id = escape(filename),
-    
+    filename = filename  
   )
 
 def load_images(image_path):
@@ -57,6 +53,7 @@ class Images(Dataset):
   def __init__(self, images):
     super(Images, self).__init__()
     self.images = images
+    self.image_files = [image.filename for image in self.images]
 
   def __len__(self):
     return len(self.images)
@@ -70,7 +67,8 @@ class Images(Dataset):
     return struct(
       colors = image.float() / 255,
       grid = item.grid.view(2, -1),
-      id = item.id,
+      index = self.image_files.index(item.filename),
+      filename = item.filename,
       image_size = torch.LongTensor([w, h])
     )
 
@@ -80,6 +78,7 @@ class SampledImages(Dataset):
     super(SampledImages, self).__init__()
     self.images = images
     self.samples = samples
+    self.image_files = [image.filename for image in self.images]
 
   def __len__(self):
     return len(self.images)
@@ -93,9 +92,10 @@ class SampledImages(Dataset):
     samples = torch.randint(0, image.shape[1], (self.samples,))
 
     return struct(
-      colors = image[:, samples].float() / 255,
+      colors = image[:, samples].half() / 255,
       grid = grid[:, samples],
-      id = item.id
+      index = self.image_files.index(item.filename),
+      filename = item.filename
     )
 
 
@@ -114,6 +114,8 @@ class Repeat(Dataset):
 
 
 def dataloaders(images, batch_size=4, samples=32*1024, epoch_size=64):
+
+
   train_dataset = Repeat(SampledImages(images, samples=samples), epoch_size)
 
   training = DataLoader(train_dataset, batch_size=batch_size, 

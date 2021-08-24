@@ -22,8 +22,8 @@ class CoordinateTrainer(pl.LightningModule):
     self.lr = lr
     self.train_iterations = train_interations
 
-  def forward(self, ids, grids):
-    return self.model.forward(ids, grids)
+  def forward(self, index, grids):
+    return self.model.forward( (index, grids) )
 
   def configure_optimizers(self):
     optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
@@ -37,7 +37,7 @@ class CoordinateTrainer(pl.LightningModule):
     return [optimizer], [scheduler]
 
   def compare(self, batch):
-    output = self.forward(batch.id, batch.grid)
+    output = self.forward(batch.index, batch.grid)
     loss = F.mse_loss(output, batch.colors)
     return output, loss
 
@@ -52,7 +52,7 @@ class CoordinateTrainer(pl.LightningModule):
     assert val_batch.grid.shape[0] == 1
     
     output, loss = self.compare(val_batch)
-    id = val_batch.id[0]
+    id = val_batch.filename[0]
 
     result = struct(
       psnr = psnr(loss).item(),

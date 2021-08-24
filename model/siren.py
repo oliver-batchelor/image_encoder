@@ -37,9 +37,8 @@ class Siren(nn.Module):
 
 class SirenNet(nn.Module):
   def __init__(self, input_size, hidden_size, output_size=3, 
-      num_layers=4, w0=5, w0_initial=30, c=6):
+      hidden_layers=1, w0=2, w0_initial=30, c=6):
     super().__init__()
-    assert num_layers >= 3
 
     w_std = math.sqrt(c / hidden_size) / w0
     
@@ -48,7 +47,7 @@ class SirenNet(nn.Module):
     final = Siren(hidden_size, output_size, w_std = w_std)
 
     layers = [Siren(hidden_size, hidden_size, w_std = w_std, activation = Sine(w0))
-     for _ in range(num_layers - 2)]
+     for _ in range(hidden_layers)]
     self.layers = nn.Sequential(initial, *layers, final)
 
 

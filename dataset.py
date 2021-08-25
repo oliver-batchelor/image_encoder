@@ -23,8 +23,8 @@ def find_images(filepath, extensions=image_extensions):
 
 def create_grid(w, h):
     y, x = torch.meshgrid([
-      torch.linspace(0, 1, steps=h), 
-      torch.linspace(0, 1, steps=w)
+      torch.arange(h) / h, 
+      torch.arange(w) / w, 
     ])
 
     return torch.stack([y, x], dim=0)

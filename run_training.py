@@ -8,7 +8,7 @@ from torch import nn
 from trainer import CoordinateTrainer
 from dataset import dataloaders, load_images
 from functools import partial
-from model.features import Concatenated, FeatureGrids, Modulated, positional_fourier, linear_fourier, random_fourier
+from model.features import Concatenated, FeatureGrids, Modulated, positional_fourier, random_fourier, random_spline
 from argparse import ArgumentParser
 
 from pytorch_lightning import Trainer
@@ -20,23 +20,23 @@ from structs.torch import shape
 
 def mlp_model(num_images, mapping_size, hidden_layers=4):
   def create_model():
-    input_size = 32
-    # encoder = random_fourier(2, mapping_size // 2)
-    encoder = linear_fourier(2, input_size, num_phases=2)
+    input_features = 512
+
+    encoder = random_fourier(2, input_features)
+    # encoder = random_spline(2, num_splines=input_features, num_points=128, scale=1)
 
     return nn.Sequential(encoder,
-                         MLP(encoder.num_outputs, mapping_size, output_size=3,
+                         MLP(input_features, mapping_size, output_size=3,
                              hidden_layers=hidden_layers),
                          nn.Sigmoid()
                          )
 
   # def create_model():
   #   return nn.Sequential(
-  #     SirenNet(2, mapping_size, 3, num_layers),
+  #     SirenNet(2, mapping_size, 3, hidden_layers),
   #     nn.Sigmoid()
   #   )
 
-  # return PerImage(image_ids, partial(SplitGrid, (4, 4), create_model))
 
   return PerImage(num_images, create_model)
 
@@ -45,8 +45,7 @@ def features_mlp(num_images, grid_size=(1, 1),
                  feature_size=128, hidden_size=256, hidden_layers=4):
 
 
-  # fourier_encoding = positional_fourier(2, 8, num_phases=2)
-  fourier_encoding = linear_fourier(2, 16)
+  fourier_encoding = positional_fourier(2, 8)
 
 
   print(f"N features {fourier_encoding.num_outputs}")
@@ -75,13 +74,13 @@ def main():
 
   with torch.no_grad():
     images = load_images(args.input)
-    loaders = dataloaders(images, batch_size=4,
-                          samples=16*1024, epoch_size=256)
+    loaders = dataloaders(images, batch_size=1,
+                          samples=16*1024, epoch_size=1024)
 
-    model = features_mlp(len(images), grid_size=(16, 16),
-                         feature_size=128, hidden_size=512, hidden_layers=5)
+    # model = features_mlp(len(images), grid_size=(16, 16),
+    #                      feature_size=128, hidden_size=512, hidden_layers=5)
 
-    # model = mlp_model(len(images), mapping_size = 256, hidden_layers=5)
+    model = mlp_model(len(images), mapping_size = 384, hidden_layers=5)
 
     encoder = CoordinateTrainer(model=model,
                                 lr=1e-3, train_interations=100)

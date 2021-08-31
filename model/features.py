@@ -6,77 +6,69 @@ from torch import nn
 import numpy as np
 import math
 
+from .spline import BSplineCubic
 
 
-class FourierEncoding(nn.Module):
-
-  def __init__(self, basis : torch.Tensor, phase=None):
-    super(FourierEncoding, self).__init__()
-    self.register_buffer("basis", 2 * np.pi * basis)
-
-    if phase == None: 
-      phase = basis.new_zeros((1,))
-    self.register_buffer("phase", phase)  
-
-  @property
-  def num_inputs(self):
-    return self.basis.shape[0]
-
-  @property
-  def num_outputs(self):
-    return self.basis.shape[1] * 2 * len(self.phase)
+class SinCos(nn.Module):
+  def __init__(self):
+    super(SinCos, self).__init__()
 
   def forward(self, x):
-    assert x.dim() == 2, f'Expected 2D input (B,C) (got shape {x.shape})'
-    assert x.shape[1] == self.num_inputs,\
-        f"Expected {self.num_inputs} got shape {x.shape}"
-
-    x = x @ self.basis
-    x = x.unsqueeze(2).expand(*x.shape, len(self.phase))
-    x = (x + self.phase).view(x.shape[0], -1)
-
     return torch.cat([torch.sin(x), torch.cos(x)], dim=1)
 
+
+
+def linear_weights(weight, bias=None, trainable=True):
+  linear = nn.Linear(weight.shape[1], weight.shape[0], bias=bias is not None)
+
+  linear.weight.copy_(weight)
+  if bias is not None:
+    linear.bias.copy_(bias)
+
+  linear.requires_grad_(trainable)
+  return linear
 
 """
 "Fourier Features Let Networks Learn High Frequency Functions in Low Dimensional Domains":
     https://people.eecs.berkeley.edu/~bmild/fourfeat/index.html
 """
-def random_fourier(input_channels, mapping_size=256, scale=10, num_phases=1):
-
-  directions = torch.randn((input_channels, mapping_size)) * scale
-  phases = torch.arange(num_phases) / num_phases
-
-  return FourierEncoding(directions, phases)
+def random_fourier(input_channels, output_size=256, scale=20):
+  basis = linear_weights(
+    torch.randn(output_size // 2, input_channels).pow(2) * scale * 2 * np.pi,
+    torch.randn(output_size // 2) * 2 * np.pi
+  )
+  return nn.Sequential(basis, SinCos())
 
 
 def make_basis(f, input_channels, n = 10):
-  directions = torch.Tensor([
+  directions = [
     [f(i) if c == d else 0 for c in range(input_channels)]
       for i in range(0, n)
-        for d in range(0, input_channels)])
+        for d in range(0, input_channels)]
+  return torch.Tensor(directions)
 
-  return directions.T
 
 """
 NeRF fourier positional encoding.
 """
 
-def positional_fourier(input_channels, num_octaves=10, num_phases=1):
-
-  directions = make_basis(lambda i: 2 ** i, input_channels, num_octaves)
-  phases = torch.arange(num_phases) / num_phases
-
-  return FourierEncoding(directions, phases)
+def positional_fourier(input_channels, num_octaves=10):
+  basis = linear_weights(
+    make_basis(lambda i: 2 ** i, input_channels, num_octaves))
+  return nn.Sequential(basis, SinCos())
 
 
+def random_spline(input_channels, num_splines=64, 
+  num_points=64, repeating=True, scale=2):
 
-def linear_fourier(input_channels, num_octaves=10, num_phases=1):
+  basis = linear_weights(
+    torch.randn(num_splines, input_channels).pow(2) * scale,
+    torch.randn(num_splines) * scale
+  )
+  return nn.Sequential(basis, 
+    BSplineCubic.randn(num_splines, num_points, 1, repeating=repeating))
 
-  directions = make_basis(lambda i: i, input_channels, num_octaves)
-  phases = torch.arange(num_phases) / num_phases
 
-  return FourierEncoding(directions, phases)
 
 class FeatureGrids(nn.Module):
   def __init__(self, num_images, grid_size=(16, 16),

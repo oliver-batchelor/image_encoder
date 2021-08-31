@@ -37,7 +37,7 @@ class Siren(nn.Module):
 
 class SirenNet(nn.Module):
   def __init__(self, input_size, hidden_size, output_size=3, 
-      hidden_layers=1, w0=2, w0_initial=30, c=6):
+      hidden_layers=1, w0=1, w0_initial=30, c=6):
     super().__init__()
 
     w_std = math.sqrt(c / hidden_size) / w0
